@@ -98,7 +98,7 @@ export default class Spotify {
     return `https://accounts.spotify.com/authorize?${new URLSearchParams({
       response_type: 'code',
       client_id: this.state.clientId,
-      scope: 'playlist-modify-public',
+      scope: 'playlist-modify-private playlist-read-collaborative',
       redirect_uri: `${this.url}/authorize/`,
       state: Buffer.from(Math.random().toFixed(4)).toString('hex'),
     })}`;
