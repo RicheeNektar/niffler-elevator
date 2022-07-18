@@ -1,0 +1,25 @@
+extend main.pug
+
+block content
+  h3 Add a song to Niffler Elevator Playlist
+
+  if authed 
+    div(class="alert alert-success") API Token refreshed. Please resubmit form.
+  else
+    if auth_missing 
+      div(class="alert alert-warning") API Token will be fetched on first submit.
+    
+  if success 
+    div(class="alert alert-success") Track added.
+  else
+    if already_added
+      div(class="alert alert-danger") Track already in playlist.
+
+  form(action="/submit", method="post") 
+    div(class="row mb-3")
+      label(class="form-label", for="spotify_link")
+        b Enter spotify link
+      input#spotify_link(class="form-control", type="url", name="spotify_link", placeholder="https://open.spotify.com/track/x")
+    div(class="btn-group")
+      button(class="btn btn-primary", type="submit") Submit
+      a(href="/search", class="btn btn-outline-primary") Search for Track

@@ -1,0 +1,24 @@
+extend main.pug
+
+block content
+  h3(id='top') Add a song to Niffler Elevator Playlist
+
+  form(id="search", action="/search", method="post") 
+    div(class="row mb-3")
+      label(class="form-label", for="query")
+        b Enter search text
+      input#query(class=`form-control ${query_invalid ? 'is-invalid' : ''}`, type="text", name="query", placeholder="Search query, e.g. take on me")
+    div(class="btn-group")
+      button(class="btn btn-primary", type="submit") Search
+      a(href="/", class="btn btn-outline-primary") Use Spotify Link
+
+  if tracks
+    div(class="d-flex row")
+      for track in tracks 
+        form(class="col-md-6 col-lg-3 col-sm-6", action='/submit', method="post")
+          input#spotify_link(type="url", name="spotify_link", hidden, value=track.external_urls.spotify)
+          button(class="btn" type="submit")
+            h5 #{track.artists.map(a => a.name).join(', ')} - #{track.name}
+            img(width="100%", class="float-start rounded-4", src=track.album.images[0].url)
+      a(class="btn btn-primary", href="#top") Back to top
+    

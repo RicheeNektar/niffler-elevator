@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "outDir": "out/",
+    "module": "Node16",
+    "noImplicitAny": true,
+    "noUnusedParameters": true,
+    "noUnusedLocals": true,
+    "noUncheckedIndexedAccess": true,
+    "removeComments": true,
+    "allowSyntheticDefaultImports": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/"
+  ],
+  "buildOptions": {
+    "traceResolution": true
+  }
+}
