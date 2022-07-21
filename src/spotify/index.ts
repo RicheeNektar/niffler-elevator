@@ -3,8 +3,9 @@ import fetch, { RequestInit } from 'node-fetch';
 import AlreadyAddedError from './errors/AlreadyAddedError.js';
 import NoTokenError from './errors/NoTokenError.js';
 import {
+  ApiAuthTokenProps,
   AuthTokenProps,
-  AuthTokenResponse,
+  PlaylistProps,
   PlaylistResponse,
 } from './types/index.js';
 
@@ -14,44 +15,42 @@ type sendRequestProps = {
   params?: RequestInit & {
     query?: URLSearchParams;
   };
-  authorization?: string;
-};
-
-type stateProps = {
-  playlistId: string;
-  clientId: string;
-  basicToken: string;
   token?: AuthTokenProps;
 };
 
 export default class Spotify {
   public static spotify: Spotify;
 
-  private state: stateProps;
   private tracks: string[] = [];
+  private playlistId: string;
+  private clientId: string;
+  private basicToken: string;
   private refresh_token: string;
   private url: string;
+  private apiToken: AuthTokenProps;
+  private accessToken: ApiAuthTokenProps;
+  private playlistInfo: PlaylistProps;
 
   constructor() {
     if (Spotify.spotify === undefined) {
       Spotify.spotify = this;
     }
 
-    const playlistId = process.env.PLAYLIST_ID;
-    const clientId = process.env.CLIENT_ID;
-    const secret = process.env.CLIENT_SECRET;
+    this.playlistId = process.env.PLAYLIST_ID;
+    this.clientId = process.env.CLIENT_ID;
     this.url = process.env.URL;
 
-    if (!(playlistId && clientId && secret)) {
+    const secret = process.env.CLIENT_SECRET;
+
+    if (!(this.playlistId && this.clientId && secret)) {
       throw new Error('env variables missing');
     }
 
-    const basicToken = Buffer.from(`${clientId}:${secret}`).toString('base64');
-    this.state = {
-      playlistId,
-      clientId,
-      basicToken,
-    };
+    this.basicToken = Buffer.from(`${this.clientId}:${secret}`).toString(
+      'base64'
+    );
+
+    this.fetchPlaylistInfo();
 
     if (existsSync('spotify.token')) {
       try {
@@ -69,12 +68,47 @@ export default class Spotify {
     }
   }
 
-  getToken() {
-    return this.state.token;
+  async fetchPlaylistInfo() {
+    this.apiToken = await this.sendRequest({
+      endpoint: 'accounts',
+      path: '/api/token',
+      params: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+        }),
+      },
+    }).catch(e => {
+      throw e;
+    });
+
+    this.playlistInfo = await this.sendRequest({
+      endpoint: 'api',
+      path: `/playlists/${this.playlistId}`,
+      token: this.apiToken,
+      params: {
+        query: new URLSearchParams({
+          fields: 'name',
+        }),
+      },
+    }).catch(e => {
+      throw e;
+    });
   }
 
-  setToken(token: AuthTokenResponse) {
-    this.state.token = token;
+  getPlaylistName() {
+    return this.playlistInfo?.name;
+  }
+
+  getToken() {
+    return this.accessToken;
+  }
+
+  setToken(token: ApiAuthTokenProps) {
+    this.accessToken = token;
 
     if (token.refresh_token) {
       this.refresh_token = token.refresh_token;
@@ -84,7 +118,7 @@ export default class Spotify {
       'spotify.token',
       Buffer.from(
         JSON.stringify({
-          ...this.state.token,
+          ...this.accessToken,
           refresh_token: this.refresh_token,
         })
       ).toString('base64')
@@ -97,7 +131,7 @@ export default class Spotify {
   getAuthorizationLink() {
     return `https://accounts.spotify.com/authorize?${new URLSearchParams({
       response_type: 'code',
-      client_id: this.state.clientId,
+      client_id: this.clientId,
       scope: 'playlist-modify-public playlist-read-collaborative',
       redirect_uri: `${this.url}/authorize/`,
       state: Buffer.from(Math.random().toFixed(4)).toString('hex'),
@@ -121,11 +155,11 @@ export default class Spotify {
    * @param code authorization_code from authorization process, required on auth request
    */
   async requestToken(code?: string) {
-    if (!this.state.token && !code) {
+    if (!this.accessToken && !code) {
       throw new Error("Required parameter missing: 'code'");
     }
 
-    const body = this.state.token
+    const body = this.accessToken
       ? {
           grant_type: 'refresh_token',
           refresh_token: this.refresh_token,
@@ -147,7 +181,6 @@ export default class Spotify {
         },
         body: new URLSearchParams(body),
       },
-      authorization: `Basic ${this.state.basicToken}`,
     }).catch(e => {
       throw e;
     });
@@ -167,7 +200,7 @@ export default class Spotify {
     const send = (offset: number = 0) =>
       this.sendRequest({
         endpoint: 'api',
-        path: `/playlists/${this.state.playlistId}/tracks/?offset=${offset}&limit=100`,
+        path: `/playlists/${this.playlistId}/tracks/?offset=${offset}&limit=100`,
         params: {
           method: 'GET',
         },
@@ -201,7 +234,7 @@ export default class Spotify {
 
     const r = await this.sendRequest({
       endpoint: 'api',
-      path: `/playlists/${this.state.playlistId}/tracks`,
+      path: `/playlists/${this.playlistId}/tracks`,
       params: {
         method: 'POST',
         body: JSON.stringify({
@@ -218,13 +251,8 @@ export default class Spotify {
     this.tracks.push(trackId);
   }
 
-  async sendRequest({
-    endpoint,
-    path,
-    params,
-    authorization,
-  }: sendRequestProps) {
-    if (endpoint === 'api' && !this.state.token) {
+  async sendRequest({ endpoint, path, params, token }: sendRequestProps) {
+    if (endpoint === 'api' && !token && !this.accessToken) {
       throw new NoTokenError(this.getAuthorizationLink());
     }
 
@@ -237,8 +265,11 @@ export default class Spotify {
       headers: {
         ...params?.headers,
         Authorization:
-          authorization ??
-          `${this.state.token?.token_type} ${this.state.token?.access_token}`,
+          endpoint === 'api'
+            ? `${token?.token_type ?? this.accessToken.token_type} ${
+                token?.access_token ?? this.accessToken.access_token
+              }`
+            : `Basic ${this.basicToken}`,
       },
     });
 
