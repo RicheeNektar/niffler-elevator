@@ -1,13 +1,13 @@
 export type AuthTokenProps = {
   token_type: string;
   access_token: string;
-  scope: string;
   expires_in: number; // seconds
 };
 
-export type AuthTokenResponse = AuthTokenProps & {
-  refresh_token?: string;
-};
+export type ApiAuthTokenProps = AuthTokenProps & {
+  refresh_token: string;
+  scope: string;
+}
 
 export type Track = {
   name: string;
@@ -22,4 +22,8 @@ export type PlaylistTrack = {
 export type PlaylistResponse = {
   items: PlaylistTrack[];
   total: number;
+};
+
+export type PlaylistProps = {
+  name: string;
 };
