@@ -1,0 +1,7 @@
+extend main.pug 
+
+block content
+  form(action="/authorize", method="post")
+    input(type="hidden", name="code", value=#{code})
+    input#playlist(type="text", name="playlist")
+    button(type="submit") Set Playlist ID

@@ -12,6 +12,19 @@ const get = (req: Request, res: Response) => {
     return res.redirect('/');
   }
 
+  res.render('authorize.pug', {
+    code,
+  });
+};
+
+const post = (req: Request, res: Response) => {
+  const pass = req.body?.password;
+  const code = req.body?.code;
+
+  if (pass === undefined || code === undefined) {
+    return res.redirect('/?error=1');
+  }
+
   Spotify.spotify
     .requestToken(code)
     .then(() => {
@@ -25,6 +38,7 @@ const get = (req: Request, res: Response) => {
 
 const register = (app: Application) => {
   app.get('/authorize', get);
+  app.post('/authorize', post);
 };
 
 export default register;
