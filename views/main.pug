@@ -12,10 +12,7 @@ html
       h3(id='top') Add a song to the '#{playlist_name}' Playlist
 
       if authed 
-        div(class="alert alert-success") API Token refreshed. Please resubmit form.
-      else
-        if auth_missing 
-          div(class="alert alert-warning") API Token will be fetched on first submit.
+        div(class="alert alert-success") API Token fetched.
           
       if success 
         div(class="alert alert-success") Track added.

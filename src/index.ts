@@ -19,10 +19,9 @@ app.use(
   })
 );
 
-app.use((_, res, next) => {
-  if (!Spotify.spotify.getPlaylistName()) {
-    res.write("Server not ready yet...");
-    return res.send();
+app.use((req, res, next) => {
+  if (!Spotify.spotify.getToken() && !req.query?.code && !req.body?.code) {
+    return res.redirect(Spotify.spotify.getAuthorizationLink());
   }
   
   next();

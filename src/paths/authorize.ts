@@ -12,24 +12,42 @@ const get = (req: Request, res: Response) => {
     return res.redirect('/');
   }
 
-  res.render('authorize.pug', {
+  return res.render('authorize.pug', {
     code,
   });
 };
 
 const post = (req: Request, res: Response) => {
-  const pass = req.body?.password;
+  const playlist = req.body?.playlist;
   const code = req.body?.code;
 
-  if (pass === undefined || code === undefined) {
-    return res.redirect('/?error=1');
+  if (code === undefined) {
+    return res.redirect('/');
   }
+
+  if (playlist === undefined) {
+    return res.render('authorize.pug', {
+      invalid: true,
+    });
+  }
+
+  const matches = playlist.match(
+    /^https?:\/\/open\.spotify\.com\/playlist\/(?<trackId>[^\?]+)/
+  );
+
+  if (!matches) {
+    return res.render('authorize.pug', {
+      invalid: true,
+    });
+  }
+
+  Spotify.spotify.setPlaylistId(matches.groups.trackId);
 
   Spotify.spotify
     .requestToken(code)
-    .then(() => {
-      res.redirect('/?authed=1');
-    })
+    .then(() =>
+      Spotify.spotify.fetchPlaylistInfo().then(() => res.redirect('/?authed=1')).catch(console.error)
+    )
     .catch(r => {
       console.error(r);
       res.sendStatus(500);

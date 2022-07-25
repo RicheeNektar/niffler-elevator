@@ -1,7 +1,8 @@
 extend main.pug 
 
 block content
-  form(action="/authorize", method="post")
-    input(type="hidden", name="code", value=#{code})
-    input#playlist(type="text", name="playlist")
-    button(type="submit") Set Playlist ID
+  form(class="form", action="/authorize", method="post")
+    input(type="hidden", name="code", value=code)
+    label Playlist URL
+      input#playlist(class=`form-control ${invalid ? 'is-invalid' : ''}`, type="url", name="playlist")
+    button(class="m-2 btn btn-primary", type="submit") Set Playlist ID

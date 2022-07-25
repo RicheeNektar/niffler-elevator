@@ -27,7 +27,6 @@ export default class Spotify {
   private basicToken: string;
   private refresh_token: string;
   private url: string;
-  private apiToken: AuthTokenProps;
   private accessToken: ApiAuthTokenProps;
   private playlistInfo: PlaylistProps;
 
@@ -36,13 +35,12 @@ export default class Spotify {
       Spotify.spotify = this;
     }
 
-    this.playlistId = process.env.PLAYLIST_ID;
     this.clientId = process.env.CLIENT_ID;
     this.url = process.env.URL;
 
     const secret = process.env.CLIENT_SECRET;
 
-    if (!(this.playlistId && this.clientId && secret)) {
+    if (!(this.clientId && secret)) {
       throw new Error('env variables missing');
     }
 
@@ -50,18 +48,19 @@ export default class Spotify {
       'base64'
     );
 
-    this.fetchPlaylistInfo();
-
     if (existsSync('spotify.token')) {
       try {
-        this.setToken(
-          JSON.parse(
-            Buffer.from(
-              readFileSync('spotify.token').toString(),
-              'base64'
-            ).toString()
-          )
+        const token = JSON.parse(
+          Buffer.from(
+            readFileSync('spotify.token').toString(),
+            'base64'
+          ).toString()
         );
+
+        this.setPlaylistId(token.playlistId);
+        this.setToken(token, false);
+
+        this.fetchPlaylistInfo();
       } catch (e) {
         rmSync('spotify.token');
       }
@@ -69,26 +68,9 @@ export default class Spotify {
   }
 
   async fetchPlaylistInfo() {
-    this.apiToken = await this.sendRequest({
-      endpoint: 'accounts',
-      path: '/api/token',
-      params: {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-        }),
-      },
-    }).catch(e => {
-      throw e;
-    });
-
     this.playlistInfo = await this.sendRequest({
       endpoint: 'api',
       path: `/playlists/${this.playlistId}`,
-      token: this.apiToken,
       params: {
         query: new URLSearchParams({
           fields: 'name',
@@ -99,6 +81,10 @@ export default class Spotify {
     });
   }
 
+  setPlaylistId(playlistId: string) {
+    this.playlistId = playlistId;
+  }
+
   getPlaylistName() {
     return this.playlistInfo?.name;
   }
@@ -107,22 +93,25 @@ export default class Spotify {
     return this.accessToken;
   }
 
-  setToken(token: ApiAuthTokenProps) {
+  setToken(token: ApiAuthTokenProps, writeFile: boolean = true) {
     this.accessToken = token;
 
     if (token.refresh_token) {
       this.refresh_token = token.refresh_token;
     }
 
-    writeFileSync(
-      'spotify.token',
-      Buffer.from(
-        JSON.stringify({
-          ...this.accessToken,
-          refresh_token: this.refresh_token,
-        })
-      ).toString('base64')
-    );
+    if (writeFile) {
+      writeFileSync(
+        'spotify.token',
+        Buffer.from(
+          JSON.stringify({
+            ...this.accessToken,
+            refresh_token: this.refresh_token,
+            playlistId: this.playlistId,
+          })
+        ).toString('base64')
+      );
+    }
   }
 
   /**
@@ -251,8 +240,8 @@ export default class Spotify {
     this.tracks.push(trackId);
   }
 
-  async sendRequest({ endpoint, path, params, token }: sendRequestProps) {
-    if (endpoint === 'api' && !token && !this.accessToken) {
+  async sendRequest({ endpoint, path, params }: sendRequestProps) {
+    if (endpoint === 'api' && !this.accessToken) {
       throw new NoTokenError(this.getAuthorizationLink());
     }
 
@@ -266,9 +255,7 @@ export default class Spotify {
         ...params?.headers,
         Authorization:
           endpoint === 'api'
-            ? `${token?.token_type ?? this.accessToken.token_type} ${
-                token?.access_token ?? this.accessToken.access_token
-              }`
+            ? `${this.accessToken.token_type} ${this.accessToken.access_token}`
             : `Basic ${this.basicToken}`,
       },
     });
@@ -291,7 +278,7 @@ export default class Spotify {
 
     let r: Error | any;
 
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 5; i++) {
       r = await send();
 
       if (r instanceof Error) {
@@ -303,6 +290,9 @@ export default class Spotify {
               throw e;
             });
             break;
+          case 403:
+            console.error(r.error.message);
+            break;
           default:
             throw new Error(r.error.message);
         }
@@ -310,5 +300,7 @@ export default class Spotify {
         return r;
       }
     }
+
+    throw new Error(r?.error?.message ?? 'Did not get a valid response with 5 tries.');
   }
 }
